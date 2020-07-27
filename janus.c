@@ -865,7 +865,7 @@ static int janus_request_check_secret(janus_request *request, guint64 session_id
 		
 		//Check plugin token
 		json_t *plugin_token = json_object_get(root, "plugin_token");
-		if(secret && json_is_string(secret) && janus_plugin_auth_is_token_valid(json_string_value(plugin_token))) {
+		if(plugin_token && json_is_string(plugin_token) && janus_plugin_auth_is_token_valid(json_string_value(plugin_token))) {
 			plugin_token_authorized = TRUE;
 		}
 
