@@ -25,6 +25,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <zdb/zdb.h>
+#include <mcrypt.h>
 #ifdef HAVE_TURNRESTAPI
 #include <curl/curl.h>
 #endif
@@ -83,7 +85,11 @@ janus_mutex counters_mutex;
 
 
 /* API secrets */
-static char *api_secret = NULL, *admin_api_secret = NULL;
+static char *api_secret = NULL, *admin_api_secret = NULL, *db_url = NULL;
+
+/* Connection pool object */
+static URL_T url = NULL;
+static ConnectionPool_T pool = NULL;
 
 /* JSON parameters */
 static int janus_process_error_string(janus_request *request, uint64_t session_id, const char *transaction, gint error, gchar *error_string);
@@ -842,7 +848,7 @@ void janus_request_destroy(janus_request *request) {
 }
 
 static int janus_request_check_secret(janus_request *request, guint64 session_id, const gchar *transaction_text) {
-	gboolean secret_authorized = FALSE, token_authorized = FALSE;
+	gboolean secret_authorized = FALSE, token_authorized = FALSE, plugin_token_authorized = FALSE;
 	if(api_secret == NULL && !janus_auth_is_enabled()) {
 		/* Nothing to check */
 		secret_authorized = TRUE;
@@ -856,6 +862,13 @@ static int janus_request_check_secret(janus_request *request, guint64 session_id
 				secret_authorized = TRUE;
 			}
 		}
+		
+		//Check plugin token
+		json_t *plugin_token = json_object_get(root, "plugin_token");
+		if(secret && json_is_string(secret) && janus_plugin_auth_is_token_valid(json_string_value(plugin_token))) {
+			plugin_token_authorized = TRUE;
+		}
+
 		if(janus_auth_is_enabled()) {
 			/* The token based authentication mechanism is enabled, check that the client provided it */
 			json_t *token = json_object_get(root, "token");
@@ -864,7 +877,7 @@ static int janus_request_check_secret(janus_request *request, guint64 session_id
 			}
 		}
 		/* We consider a request authorized if either the proper API secret or a valid token has been provided */
-		if(!secret_authorized && !token_authorized)
+		if(!secret_authorized && !token_authorized && !plugin_token_authorized)
 			return JANUS_ERROR_UNAUTHORIZED;
 	}
 	return 0;
@@ -3859,6 +3872,34 @@ gboolean janus_plugin_auth_signature_contains(janus_plugin *plugin, const char *
 	return janus_auth_check_signature_contains(token, plugin->get_package(), descriptor);
 }
 
+gboolean janus_plugin_auth_is_token_valid(const char* token) {
+	if(token == NULL) return FALSE;
+	Connection_T con = ConnectionPool_getConnection(pool);
+	TRY
+	{		
+		PreparedStatement_T p = Connection_prepareStatement(con, "select * from plugin_token where token=?");
+		PreparedStatement_setString(p, 1, token);
+		ResultSet_T result = PreparedStatement_executeQuery(p);
+		while (ResultSet_next(result)) 
+		{
+			//int id = ResultSet_getInt(result, 1);
+			//const char *id = ResultSet_getString(result, 1);
+			return TRUE;
+		}
+	}
+	CATCH(SQLException)
+	{
+		JANUS_LOG(LOG_ERR, "SQLException test -- %s\n", Exception_frame.message);
+	}
+	FINALLY
+	{
+		Connection_close(con);
+	}
+	END_TRY;
+	
+	return FALSE;
+}
+
 
 /* Main */
 gint main(int argc, char *argv[])
@@ -4482,6 +4523,21 @@ gint main(int argc, char *argv[])
 	if(item && item->value) {
 		api_secret = g_strdup(item->value);
 	}
+
+	db_url = NULL;
+	item = janus_config_get(config, config_general, janus_config_type_item, "db_url");
+	if(item && item->value) {
+		db_url = g_strdup(item->value);
+	}
+
+	/** Initial sql connection pool **/
+	if (db_url != NULL) {
+		URL_T url = URL_new(db_url);
+		pool = ConnectionPool_new(url);
+		ConnectionPool_start(pool);
+	}
+	
+
 	/* Is there any API secret to consider? */
 	admin_api_secret = NULL;
 	item = janus_config_get(config, config_general, janus_config_type_item, "admin_secret");
