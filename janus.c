@@ -25,12 +25,12 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <poll.h>
-#include <zdb/zdb.h>
 #include <mcrypt.h>
 #ifdef HAVE_TURNRESTAPI
 #include <curl/curl.h>
 #endif
 
+#include <zdb/zdb.h>
 #include "janus.h"
 #include "version.h"
 #include "cmdline.h"
@@ -864,9 +864,11 @@ static int janus_request_check_secret(janus_request *request, guint64 session_id
 		}
 		
 		//Check plugin token
-		json_t *plugin_token = json_object_get(root, "plugin_token");
-		if(plugin_token && json_is_string(plugin_token) && janus_plugin_auth_is_token_valid(json_string_value(plugin_token))) {
-			plugin_token_authorized = TRUE;
+		if(db_url != NULL) {
+			json_t *plugin_token = json_object_get(root, "plugin_token");
+			if(plugin_token && json_is_string(plugin_token) && janus_plugin_auth_is_token_valid(json_string_value(plugin_token))) {
+				plugin_token_authorized = TRUE;
+			}
 		}
 
 		if(janus_auth_is_enabled()) {
@@ -3873,6 +3875,7 @@ gboolean janus_plugin_auth_signature_contains(janus_plugin *plugin, const char *
 }
 
 gboolean janus_plugin_auth_is_token_valid(const char* token) {
+	JANUS_LOG(LOG_INFO, "Plugin_token++++++++++ %s\n", token);
 	if(token == NULL) return FALSE;
 	Connection_T con = ConnectionPool_getConnection(pool);
 	TRY
@@ -3883,7 +3886,8 @@ gboolean janus_plugin_auth_is_token_valid(const char* token) {
 		while (ResultSet_next(result)) 
 		{
 			//int id = ResultSet_getInt(result, 1);
-			//const char *id = ResultSet_getString(result, 1);
+			const char *r = ResultSet_getString(result, 2);
+			JANUS_LOG(LOG_INFO, "Check token is OK ++++++++++ %s\n", r);
 			return TRUE;
 		}
 	}
@@ -4529,6 +4533,7 @@ gint main(int argc, char *argv[])
 	if(item && item->value) {
 		db_url = g_strdup(item->value);
 	}
+	JANUS_LOG(LOG_INFO, "DB_URL++++++++++++++++++++++++++++ %s", db_url)
 
 	/** Initial sql connection pool **/
 	if (db_url != NULL) {
