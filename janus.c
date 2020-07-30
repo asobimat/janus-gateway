@@ -864,6 +864,7 @@ static int janus_request_check_secret(janus_request *request, guint64 session_id
 		}
 		
 		//Check plugin token
+		JANUS_LOG(LOG_ERR, "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT: %s\n", db_url);
 		if(db_url != NULL) {
 			json_t *plugin_token = json_object_get(root, "plugin_token");
 			if(plugin_token && json_is_string(plugin_token) && janus_plugin_auth_is_token_valid(json_string_value(plugin_token))) {
@@ -3875,7 +3876,7 @@ gboolean janus_plugin_auth_signature_contains(janus_plugin *plugin, const char *
 }
 
 gboolean janus_plugin_auth_is_token_valid(const char* token) {
-	JANUS_LOG(LOG_INFO, "Plugin_token++++++++++ %s\n", token);
+	JANUS_LOG(LOG_ERR, "Plugin_token++++++++++ %s\n", token);
 	if(token == NULL) return FALSE;
 	Connection_T con = ConnectionPool_getConnection(pool);
 	TRY
@@ -4533,7 +4534,7 @@ gint main(int argc, char *argv[])
 	if(item && item->value) {
 		db_url = g_strdup(item->value);
 	}
-	JANUS_LOG(LOG_INFO, "DB_URL++++++++++++++++++++++++++++ %s", db_url);
+	JANUS_LOG(LOG_ERR, "DB_URL++++++++++++++++++++++++++++ %s", db_url);
 
 	/** Initial sql connection pool **/
 	if (db_url != NULL) {
