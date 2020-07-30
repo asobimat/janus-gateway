@@ -287,4 +287,6 @@ gint janus_is_stopping(void);
  * @returns TRUE if WebRTC encryption is enabled (the default), and FALSE otherwise */
 gboolean janus_is_webrtc_encryption_enabled(void);
 
+gboolean janus_plugin_auth_is_token_valid(const char* token);
+
 #endif
