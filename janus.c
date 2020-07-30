@@ -4533,7 +4533,7 @@ gint main(int argc, char *argv[])
 	if(item && item->value) {
 		db_url = g_strdup(item->value);
 	}
-	JANUS_LOG(LOG_INFO, "DB_URL++++++++++++++++++++++++++++ %s", db_url)
+	JANUS_LOG(LOG_INFO, "DB_URL++++++++++++++++++++++++++++ %s", db_url);
 
 	/** Initial sql connection pool **/
 	if (db_url != NULL) {
